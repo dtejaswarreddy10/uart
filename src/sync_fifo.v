@@ -3,14 +3,48 @@
 Synchronous fifo
 */
 
-module sync_fifo #(Parameter DATA_WIDTH = 8, FIFO_DEPTH = 16)(
+module sync_fifo #(
+	parameter DATA_WIDTH = 8,
+        parameter FIFO_DEPTH = 16
+)(
 	input clk,reset,
 	input write_enable,
 	input[DATA_WIDTH-1:0] write_data,
 	output full,
 	input read_enabe,
-	output [DATA_WIDTH-1:0]read_data,
-	output empty);
+	output reg [DATA_WIDTH-1:0]read_data,
+	output empty
+);
 
+	parameter pointer_width = $clog2(FIFO_DEPTH)
+	reg [DATA_WIDTH-1:0] fifo[0:FIFO_DEPTH-1];
+	reg [pointer_width-1:0]write_pointer;
+	reg [pointer_width-1:0]read_pointer;
+
+	always@(posedge clk or posedge reset) begin
+		if(reset) begin
+			write_pointer <= 0;
+			read_pointer  <= 0;
+			read_data     <= 0;
+                end
+        end
+
+	always@(posedge clk ) begin
+		if(write_enable & !full) begin
+			write_pointer       <= write_pointer +1;
+			fifo[write_pointer] <= write_data;
+		end
+	end
+
+
+	always@(posedge clk) begin
+                if(read_enable & !empty) begin
+                        read_pointer <= read_pointer +1;
+                        read_data    <= fifo[read_pointer] ;
+                end
+        end
+
+	assign full  = (write_pointer+1 == read_pointer);
+	assign empty = (write_pointer == read_pointer); 
 
 endmodule
