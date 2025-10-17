@@ -3,11 +3,12 @@ This Module controls converts the parallel data into serial
 */
 
 module tx_control #(parameter DATA_WIDTH = 8,SAMPLING =16)(
-	input clk,reset,
+	input clk,reset,bclk,
 	input [1:0]parity,stop,
-	input start,busy,
+	input start,
+	output reg busy,
 	input [DATA_WIDTH-1:0] p_data_in,
-	output s_data_out);
+	output reg s_data_out);
 
 //	localparam IDLE= 3'b000,START=3'b001,DATA=3'b010,PARITY=3'b011,STOP=3'b100;			// Binary Encoding
 	localparam IDLE= 3'b000,START=3'b001,DATA=3'b011,PARITY=3'b010,STOP=3'b110;			// Gray Encoding
@@ -23,6 +24,10 @@ module tx_control #(parameter DATA_WIDTH = 8,SAMPLING =16)(
 	reg [DATA_WIDTH-1:0] data_reg;
 	wire parity_calc;
 
+	reg sampling_flag;
+	reg data_flag;
+	reg stop_flag;
+
 	always@(posedge clk or posedge reset) begin
 		if(reset) present_state <= IDLE;
 		else      present_state <= next_state;
@@ -37,28 +42,33 @@ module tx_control #(parameter DATA_WIDTH = 8,SAMPLING =16)(
 				else      next_state = IDLE;
 			end
 			START : begin
-				if(sampling_counter== (SAMPLING - 1)) next_state = DATA;
+				if(sampling_counter== (SAMPLING - 1) & sampling_flag) next_state = DATA;
 				else 	 next_state = START;
+				end
 			DATA : begin
-				if(data_counter >= DATA_WIDTH) begin
+				if(data_flag & sampling_flag) begin
 					if(parity == 0) next_state = STOP;
 					else            next_state = PARITY;
 				end	
 				else next_state = DATA;
 			end
 			PARITY : begin
-                                        if(sampling_counter== (SAMPLING - 1)) next_state = STOP;
+                                        if(sampling_counter == (SAMPLING - 1) & sampling_flag) next_state = STOP;
                                         else     next_state = PARITY;
+				end
 
 			STOP : begin
-                                if(stop_counter >= 2) next_state = IDLE;
+                                if(stop_flag & sampling_flag ) next_state = IDLE;
                                 else next_state = STOP;
                         end
 
 		endcase
 	end
 
-	always@(posedge clk or posedge reset) begin
+	//always@(posedge clk or posedge reset) begin
+	//	if (reset) data_counter <= 0;
+	//always@(present_state,sampling_counter)begin
+	always@(posedge bclk or posedge reset)begin
 		if (reset) data_counter <= 0;
 		else if(present_state == DATA) begin
 			if (sampling_counter == (SAMPLING - 1)) data_counter <= data_counter +1;
@@ -66,8 +76,10 @@ module tx_control #(parameter DATA_WIDTH = 8,SAMPLING =16)(
 		else data_counter = 0;
 	end
 
-	always@(posedge clk or posedge reset) begin
-                if (reset) stop_counter <= 0;
+	//always@(posedge clk or posedge reset) begin
+	//	if (reset) stop_counter <= 0;
+	always@(posedge bclk or posedge reset) begin
+		if (reset) stop_counter <= 0;
                 else if(present_state == STOP) begin
                         if (sampling_counter== (SAMPLING - 1)) stop_counter <= stop_counter +1;
                 end
@@ -79,32 +91,43 @@ module tx_control #(parameter DATA_WIDTH = 8,SAMPLING =16)(
 		else if(bclk) sampling_counter <= sampling_counter + 1;
 	end
 
-
-	always@(*)begin
-		if (present_state == IDLE) data_reg = p_data_in ;
-	end
-
-	always@(*)begin
-                if (present_state == START) s_data_out = 0 ;
+	always@(posedge bclk or posedge reset) begin
+		if (reset) sampling_flag <= 0;
+                else if(sampling_counter== (SAMPLING - 1)) sampling_flag <= 1'b1;
+                else sampling_flag <= 0;
         end
 
-	always@(*)begin
-                if (present_state == DATA) s_data_out = data_reg[data_counter] ;
+	always@(posedge bclk or posedge reset) begin
+		if (reset) data_flag <= 0;
+                else if(data_counter == (DATA_WIDTH - 1)) data_flag <= 1'b1;
+                else data_flag <= 0;
         end
-
-	always@(*)begin
-                if (present_state == STOP) s_data_out = 1 ;
+		
+	always@(posedge bclk or posedge reset) begin
+		if (reset) stop_flag <= 0;
+                else if(stop_counter == stop & present_state == STOP) stop_flag <= 1'b1;
+                else stop_flag <= 0;
         end
+//----------------------------
+// Output values for s_data_out and busy signals at each state in the fsm
+//----------------------------
 
 	assign parity_calc = ^data_reg;  					// XOR reduction gives '1' if number of 1's in data is odd
 
 	always@(*)begin
-		if (present_state == PARITY) begin
-			if(parity == 2'b01)   s_data_out = ~parity_calc ;				// odd parity
-			if(parity == 2'b10)   s_data_out = parity_calc; 				// even parity 	
-		end
-        end
+		case(present_state)
+			IDLE : begin data_reg = p_data_in ; busy = 0 ; end
+			START : begin s_data_out = 0 ; busy = 1; end
+			DATA : begin s_data_out = data_reg[data_counter] ; busy = 1 ;end
+			PARITY : begin  
+					busy = 1;
+					if(parity == 2'b01)   s_data_out = ~parity_calc ;				// odd parity
+					if(parity == 2'b10)   s_data_out = parity_calc; 				// even parity
+				end 
+			STOP : begin s_data_out = 1 ; busy = 1 ;end
 
+		endcase
+	end
 
 
 endmodule
