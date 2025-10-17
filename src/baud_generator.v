@@ -23,9 +23,7 @@ This periodic bclk pulse is used by the UART TX and RX modules to time their ope
 */
 
 module baud_generator #(
-	parameter SAMPLING = 16,
-	parameter CLK_FREQUENCY = 100000000,
-        parameter BAUD_RATE = 9600
+	parameter SAMPLING = 16,CLK_FREQUENCY = 100000000,BAUD_RATE = 9600
 ) (
 	input clk,reset,
 	output reg bclk
@@ -37,13 +35,14 @@ module baud_generator #(
 		if(reset) begin
 			count <= 0;
 			bclk  <= 1'b0;
-		else if(count == n) begin
+		end
+		else if(count == n-1) begin
 			bclk  <= 1'b1;
 			count <= 0;
 		end
 		else begin
 			count <= count+1;
-			bclk  <= 1'b0
+			bclk  <= 1'b0;
 		end
 	end 
 endmodule
