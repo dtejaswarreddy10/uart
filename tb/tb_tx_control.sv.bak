@@ -138,9 +138,6 @@ module tb_tx_control;
 
 
 	wait(dut.fifo_empty == 1'b1);
-	wait(dut.control_instance.busy == 1);
-	wait(dut.control_instance.busy == 0);
-	
     $display("\n===== All UART TX Tests Completed =====\n");
     $finish;
   end

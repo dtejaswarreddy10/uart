@@ -113,7 +113,7 @@ module tx_control #(parameter DATA_WIDTH = 8,SAMPLING =16)(
 	always @(posedge clk or posedge reset) begin
         if (reset)
             data_reg <= 0;
-        else if (present_state == START)
+        else if (start)
             data_reg <= p_data_in;
     end
 //----------------------------
