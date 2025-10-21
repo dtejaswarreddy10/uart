@@ -28,12 +28,19 @@ module tx_control #(parameter DATA_WIDTH = 8,SAMPLING =16)(
 	reg data_flag;
 	reg stop_flag;
 
+//-----------------------
+// FSM: State Register
+//-----------------------
+
 	always@(posedge clk or posedge reset) begin
 		if(reset) present_state <= IDLE;
 		else      present_state <= next_state;
 
 	end
 
+//-------------------------
+// FSM: Next-State Logic
+//-------------------------
 
 	always@(*)begin
 		case(present_state) 
@@ -64,6 +71,16 @@ module tx_control #(parameter DATA_WIDTH = 8,SAMPLING =16)(
 
 		endcase
 	end
+//------------------------------
+//------------------------------
+	
+	always@(posedge clk or posedge reset) begin
+		if (reset) sampling_counter <= 0;
+		else if(bclk) sampling_counter <= sampling_counter + 1;
+	end
+
+//------------------------------
+//------------------------------
 
 	//always@(posedge clk or posedge reset) begin
 	//	if (reset) data_counter <= 0;
@@ -86,10 +103,7 @@ module tx_control #(parameter DATA_WIDTH = 8,SAMPLING =16)(
                 else stop_counter = 0;
         end
 
-	always@(posedge clk or posedge reset) begin
-		if (reset) sampling_counter <= 0;
-		else if(bclk) sampling_counter <= sampling_counter + 1;
-	end
+	
 
 	always@(posedge bclk or posedge reset) begin
 		if (reset) sampling_flag <= 0;
@@ -109,30 +123,45 @@ module tx_control #(parameter DATA_WIDTH = 8,SAMPLING =16)(
                 else stop_flag <= 0;
         end
 
+//-------------------------------------------------------------------------
+// Data Register (Latch new byte only once at start)
+//-------------------------------------------------------------------------
 
 	always @(posedge clk or posedge reset) begin
         if (reset)
             data_reg <= 0;
         else if (present_state == START)
             data_reg <= p_data_in;
-    end
-//----------------------------
-// Output values for s_data_out and busy signals at each state in the fsm
-//----------------------------
+    	end
+
+//-------------------------
+// Parity Calculation
+//-------------------------
 
 	assign parity_calc = ^data_reg;  					// XOR reduction gives '1' if number of 1's in data is odd
 
-	always@(*)begin
+
+//======================================
+// OUTPUT LOGIC
+// Output values for s_data_out and busy signals at each state in the fsm
+//======================================
+
+	
+	always@(posedge clk or posedge reset )begin
+		if (reset) begin
+			s_data_out <= 1'b0;
+			busy <= 1'b0;
+		end
 		case(present_state)
-			IDLE : begin busy = 0 ; end
-			START : begin s_data_out = 0 ; busy = 1; end
-			DATA : begin s_data_out = data_reg[data_counter] ; busy = 1 ;end
+			IDLE : begin s_data_out <= 1'b1 ; busy <= 0 ; end
+			START : begin s_data_out <= 0 ; busy <= 1; end
+			DATA : begin s_data_out <= data_reg[data_counter] ; busy <= 1 ;end
 			PARITY : begin  
-					busy = 1;
-					if(parity == 2'b01)   s_data_out = ~parity_calc ;				// odd parity
-					if(parity == 2'b10)   s_data_out = parity_calc; 				// even parity
+					busy <= 1;
+					if(parity == 2'b01)   s_data_out <= ~parity_calc ;				// odd parity
+					if(parity == 2'b10)   s_data_out <= parity_calc; 				// even parity
 				end 
-			STOP : begin s_data_out = 1 ; busy = 1 ;end
+			STOP : begin s_data_out <= 1 ; busy <= 1 ;end
 
 		endcase
 	end

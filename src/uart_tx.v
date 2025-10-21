@@ -5,16 +5,15 @@
 
 module uart_tx #(parameter DATA_WIDTH = 8,SAMPLING = 16)(
 	input clk,reset,
-//	input bclk,
+	input bclk,
 	output reg ready,
 	input valid,
 	input mode,
 	input [1:0]parity_select,stop_select,
 	input [DATA_WIDTH-1:0] p_data_in,
-	output s_data_out,
-	output temp_busy);
+	output s_data_out
+	);
 
-	wire bclk;
 
 	reg fifo_wr_en;
 	reg [DATA_WIDTH-1:0]fifo_wr_data;
@@ -27,12 +26,11 @@ module uart_tx #(parameter DATA_WIDTH = 8,SAMPLING = 16)(
 	reg [DATA_WIDTH-1:0]tx_control_data_in;
 	wire tx_control_busy;
 
-	tx_control control_instance (.clk(clk),.reset(reset),.bclk(bclk),.parity(parity_select),.stop(stop_select),.start(tx_control_start),.busy(tx_control_busy),.p_data_in(tx_control_data_in),.s_data_out(s_data_out));
-
-	baud_generator badu_gen_instance(.clk(clk),.reset(reset),.bclk(bclk));
+	tx_control #(.DATA_WIDTH(DATA_WIDTH),.SAMPLING(SAMPLING)) control_instance (.clk(clk),.reset(reset),.bclk(bclk),.parity(parity_select),.stop(stop_select),.start(tx_control_start),.busy(tx_control_busy),.p_data_in(tx_control_data_in),.s_data_out(s_data_out));
 
 
-	sync_fifo #(.DATA_WIDTH(8),.FIFO_DEPTH(16)
+
+	sync_fifo #(.DATA_WIDTH(DATA_WIDTH),.FIFO_DEPTH(16)
 ) tx_fifo_instance (
         .clk(clk),.reset(reset),
         .write_enable(fifo_wr_en),
@@ -43,6 +41,8 @@ module uart_tx #(parameter DATA_WIDTH = 8,SAMPLING = 16)(
         .empty(fifo_empty)
 );
 
+
+	
 //-----------------------------
 //----------------------------
 
