@@ -8,6 +8,7 @@ module tb_tx_control;
   localparam CLK_FREQ   = 100_000_000; // 100 MHz
   localparam SAMPLING   = 16;
   localparam DATA_WIDTH = 8;
+  localparam BAUD_RATE  = 9600;
 
   // ------------------------------------------------------------
   // Testbench Signals
@@ -20,26 +21,32 @@ module tb_tx_control;
   reg [1:0] parity_select;
   reg [1:0] stop_select;
   reg [DATA_WIDTH-1:0] p_data_in;
-  wire s_data_out;
-  wire temp_busy;
+  wire [DATA_WIDTH-1:0]p_data_out;
+ 
+  wire valid_out;
+  wire parity_error,stop_error;
 
   // ------------------------------------------------------------
   // DUT Instantiation
   // ------------------------------------------------------------
-  uart_tx #(
+  uart_loop_back #(
     .DATA_WIDTH(DATA_WIDTH),
-    .SAMPLING(SAMPLING)
-  ) dut (
+    .SAMPLING(SAMPLING),
+    .CLK_FREQUENCY(CLK_FREQ),
+    .BAUD_RATE(BAUD_RATE)
+  ) duv (
     .clk(clk),
     .reset(reset),
     .ready(ready),
-    .valid(valid),
+    .valid_in(valid),
     .mode(mode_select),
-    .parity_select(parity_select),
-    .stop_select(stop_select),
+    .parity(parity_select),
+    .stop(stop_select),
     .p_data_in(p_data_in),
-    .s_data_out(s_data_out),
-    .temp_busy(temp_busy)
+    .p_data_out(p_data_out),
+    .valid_out(valid_out),
+    .parity_error(parity_error),
+    .stop_error(stop_error)
   );
 
   // ------------------------------------------------------------
@@ -137,9 +144,9 @@ module tb_tx_control;
 
 
 
-	wait(dut.fifo_empty == 1'b1);
-	wait(dut.control_instance.busy == 1);
-	wait(dut.control_instance.busy == 0);
+	wait(duv.dut_tx.fifo_empty == 1'b1);
+	wait(duv.dut_tx.control_instance.busy == 1);
+	wait(duv.dut_tx.control_instance.busy == 0);
 	
     $display("\n===== All UART TX Tests Completed =====\n");
     $finish;
